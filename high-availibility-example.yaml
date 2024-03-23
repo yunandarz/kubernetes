@@ -1,0 +1,69 @@
+# Deployment specification
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 3 # This defines the desired number of replicas for your application.
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-app
+        image: my-app:v2 # This is the new image that you want to update to.
+        ports:
+        - containerPort: 8080
+        livenessProbe: # This defines a health check for your pod using an HTTP request.
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10 # This defines how long to wait before performing the first probe.
+          periodSeconds: 10 # This defines how often to perform the probe.
+          failureThreshold: 3 # This defines how many failures to tolerate before restarting the pod.
+        readinessProbe: # This defines a readiness check for your pod using an HTTP request.
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 10 # This defines how long to wait before performing the first probe.
+          periodSeconds: 10 # This defines how often to perform the probe.
+          successThreshold: 2 # This defines how many successes to require before marking the pod as ready.
+      serviceAccountName: my-app-sa # This defines the service account that the pod will use to access the Kubernetes API server.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 2 # This means that up to 2 pods can be unavailable during the update process.
+      maxSurge: 3 # This means that up to 3 more pods than the desired number can be created during the update process.
+
+# Service specification
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-service
+spec:
+  selector:
+    app: my-app # This matches the label of the pods that are part of the service.
+  ports:
+  - protocol: TCP
+    port: 80 # This is the port that the service will expose externally.
+    targetPort: 8080 # This is the port that the pods will listen on internally.
+  type: LoadBalancer # This means that the service will be exposed externally using a cloud provider's load balancer.
+
+# Ingress specification
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: my-app-ingress
+spec:
+  rules:
+  - host: my-app.example.com # This is the host name that will be used to access the service from outside the cluster.
+    http:
+      paths:
+      - path: / # This is the path that will be used to access the service from outside the cluster.
+        backend:
+          serviceName: my-app-service # This refers to the name of the service that will handle the traffic.
+          servicePort: 80 # This refers to the port of the service that will handle the traffic.
